@@ -11,10 +11,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
@@ -33,12 +36,20 @@ fun TaskListScreen(
     val tasks by viewModel.allTasks.collectAsState(initial = emptyList())
     val listState = rememberTransformingLazyColumnState()
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     
     var isPermissionGranted by remember { mutableStateOf(viewModel.isAlarmPermissionGranted()) }
 
-    // Re-check permission when screen becomes visible
-    LaunchedEffect(Unit) {
-        isPermissionGranted = viewModel.isAlarmPermissionGranted()
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                isPermissionGranted = viewModel.isAlarmPermissionGranted()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     ScreenScaffold(
@@ -163,7 +174,7 @@ fun TaskItem(
                     }
                 }
                 Text(
-                    text = "${formatTime(task.startTime)} - ${formatTime(task.endTime)}",
+                    text = "${formatTimeFromOffset(task.startTime)} - ${formatTimeFromOffset(task.endTime)}",
                     style = MaterialTheme.typography.bodySmall
                 )
                 Text(
@@ -173,7 +184,7 @@ fun TaskItem(
                 
                 if (task.isActive) {
                     Text(
-                        text = "NR: ${nextRunMillis?.let { formatTime(it) } ?: "Stopped"}",
+                        text = "NR: ${nextRunMillis?.let { formatTimeFromTimestamp(it) } ?: "Stopped"}",
                         style = MaterialTheme.typography.bodySmall.copy(
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold
@@ -192,7 +203,14 @@ fun TaskItem(
     }
 }
 
-fun formatTime(millis: Long): String {
+fun formatTimeFromOffset(millis: Long): String {
+    val totalMinutes = millis / 60000
+    val hours = (totalMinutes / 60).toInt()
+    val minutes = (totalMinutes % 60).toInt()
+    return "%02d:%02d".format(hours, minutes)
+}
+
+fun formatTimeFromTimestamp(millis: Long): String {
     val calendar = Calendar.getInstance().apply { timeInMillis = millis }
     val hours = calendar.get(Calendar.HOUR_OF_DAY)
     val minutes = calendar.get(Calendar.MINUTE)

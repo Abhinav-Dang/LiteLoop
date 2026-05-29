@@ -1,12 +1,10 @@
 package com.example.liteloop.scheduler
 
-import android.content.Context
-import android.util.Log
 import com.example.liteloop.data.Task
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.mockito.Mockito.mock
 import java.util.*
 
 class OvernightSchedulingTest {
@@ -17,7 +15,7 @@ class OvernightSchedulingTest {
     }
 
     @Test
-    fun testOvernightWindow_CurrentTime2334() {
+    fun testOvernightWindow_AnchoredInterval() {
         val task = Task(
             name = "Overnight Task",
             startTime = 22 * 3600000L, // 22:00
@@ -27,6 +25,7 @@ class OvernightSchedulingTest {
             isActive = true
         )
 
+        // Simulated current time: 23:34:00
         val calendar = Calendar.getInstance()
         calendar.set(Calendar.HOUR_OF_DAY, 23)
         calendar.set(Calendar.MINUTE, 34)
@@ -34,7 +33,7 @@ class OvernightSchedulingTest {
         calendar.set(Calendar.MILLISECOND, 0)
         val now = calendar.timeInMillis
 
-        println("DEBUG: Testing Task '${task.name}' [22:00 - 04:00]")
+        println("DEBUG: Testing Anchored Logic for '${task.name}'")
         println("DEBUG: Current simulated time: ${formatTime(now)}")
 
         val scheduler = ReminderScheduler(null)
@@ -44,65 +43,73 @@ class OvernightSchedulingTest {
         println("DEBUG: Calculated Next Run: ${formatTime(nextTime!!)}")
         
         val resultCal = Calendar.getInstance().apply { timeInMillis = nextTime }
+        
+        // Anchored to 22:00. Intervals: 22:05, 22:10 ... 23:30, 23:35.
+        // So at 23:34:00, the next run should be 23:35:00.
         assertEquals("Hour should be 23", 23, resultCal.get(Calendar.HOUR_OF_DAY))
-        assertEquals("Minute should be 39", 39, resultCal.get(Calendar.MINUTE))
+        assertEquals("Minute should be 35", 35, resultCal.get(Calendar.MINUTE))
+        assertTrue("Next time must be in future", nextTime > now)
     }
 
     @Test
-    fun testAnyMinuteInterval_1Min() {
+    fun testStartOfWindow_TriggerExactlyAtStart() {
         val task = Task(
-            name = "1 Min Task",
-            startTime = 9 * 3600000L,
-            endTime = 17 * 3600000L,
-            frequencyMinutes = 1,
+            name = "Morning Task",
+            startTime = 9 * 3600000L, // 09:00
+            endTime = 12 * 3600000L,
+            frequencyMinutes = 10,
             daysOfWeek = "1,2,3,4,5,6,7",
             isActive = true
         )
 
+        // Current time: 08:30
         val calendar = Calendar.getInstance()
-        calendar.set(Calendar.HOUR_OF_DAY, 10)
-        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.HOUR_OF_DAY, 8)
+        calendar.set(Calendar.MINUTE, 30)
         calendar.set(Calendar.SECOND, 0)
         val now = calendar.timeInMillis
 
-        println("DEBUG: Testing 1-minute interval at 10:00:00")
         val scheduler = ReminderScheduler(null)
         val nextTime = scheduler.calculateNextOccurrenceAtTime(task, now)
         
         assertNotNull(nextTime)
-        println("DEBUG: Calculated Next Run (1m): ${formatTime(nextTime!!)}")
+        val resultCal = Calendar.getInstance().apply { timeInMillis = nextTime!! }
         
-        val resultCal = Calendar.getInstance().apply { timeInMillis = nextTime }
-        assertEquals(10, resultCal.get(Calendar.HOUR_OF_DAY))
-        assertEquals(1, resultCal.get(Calendar.MINUTE))
+        // Should trigger at exactly the start time
+        assertEquals(9, resultCal.get(Calendar.HOUR_OF_DAY))
+        assertEquals(0, resultCal.get(Calendar.MINUTE))
     }
 
     @Test
-    fun testAnyMinuteInterval_3Min() {
+    fun testNearEndOfWindow_NoMoreIntervals() {
         val task = Task(
-            name = "3 Min Task",
-            startTime = 9 * 3600000L,
-            endTime = 17 * 3600000L,
-            frequencyMinutes = 3,
+            name = "Morning Task",
+            startTime = 9 * 3600000L, // 09:00
+            endTime = 9 * 3600000L + 15 * 60000L, // 09:15
+            frequencyMinutes = 10,
             daysOfWeek = "1,2,3,4,5,6,7",
             isActive = true
         )
 
+        // Current time: 09:12
         val calendar = Calendar.getInstance()
-        calendar.set(Calendar.HOUR_OF_DAY, 10)
-        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.HOUR_OF_DAY, 9)
+        calendar.set(Calendar.MINUTE, 12)
         calendar.set(Calendar.SECOND, 0)
         val now = calendar.timeInMillis
 
-        println("DEBUG: Testing 3-minute interval at 10:00:00")
         val scheduler = ReminderScheduler(null)
         val nextTime = scheduler.calculateNextOccurrenceAtTime(task, now)
         
-        assertNotNull(nextTime)
-        println("DEBUG: Calculated Next Run (3m): ${formatTime(nextTime!!)}")
+        // 09:00 was first trigger. 09:10 was second. Next would be 09:20.
+        // But 09:20 is past 09:15.
+        // So it should schedule for the NEXT DAY at 09:00.
         
-        val resultCal = Calendar.getInstance().apply { timeInMillis = nextTime }
-        assertEquals(10, resultCal.get(Calendar.HOUR_OF_DAY))
-        assertEquals(3, resultCal.get(Calendar.MINUTE))
+        assertNotNull(nextTime)
+        val resultTime = nextTime!!
+        val resultCal = Calendar.getInstance().apply { timeInMillis = resultTime }
+        assertEquals(9, resultCal.get(Calendar.HOUR_OF_DAY))
+        assertEquals(0, resultCal.get(Calendar.MINUTE))
+        assertTrue("Must be at least 12 hours in future (tomorrow)", resultTime - now > 12 * 3600000)
     }
 }

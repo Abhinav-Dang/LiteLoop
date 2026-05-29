@@ -118,25 +118,45 @@ class ReminderScheduler(private val context: Context?) {
                     endCal.add(Calendar.DAY_OF_YEAR, 1)
                 }
 
-                if (i == 0) {
-                    if (now < startCal.timeInMillis) {
-                        return startCal.timeInMillis
-                    } else if (now >= startCal.timeInMillis && now < endCal.timeInMillis - 1000) {
-                        val nextFreq = now + (task.frequencyMinutes * 60000)
-                        return if (nextFreq < endCal.timeInMillis) nextFreq else null
-                    }
+                // Logic: Find the first multiple of frequency from startCal that is > now
+                // within the window [startCal, endCal]
+                
+                val startTimeMillis = startCal.timeInMillis
+                val endTimeMillis = endCal.timeInMillis
+                val freqMillis = task.frequencyMinutes * 60000L
+
+                if (now < startTimeMillis) {
+                    // Before window starts today
+                    return startTimeMillis
+                } else if (now >= startTimeMillis && now < endTimeMillis - 1000) {
+                    // Inside window
+                    val elapsedSinceStart = now - startTimeMillis
+                    val intervalsPassed = elapsedSinceStart / freqMillis
+                    val nextRun = startTimeMillis + (intervalsPassed + 1) * freqMillis
                     
-                    if (task.endTime <= task.startTime) {
-                        val yesterdayStart = (startCal.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }
-                        val yesterdayEnd = (endCal.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }
+                    if (nextRun < endTimeMillis) {
+                        return nextRun
+                    }
+                    // Else: past the last possible interval for this window, fall through to next day
+                }
+                
+                // If it's overnight, check if we are in the tail end of yesterday's window
+                if (task.endTime <= task.startTime && i == 0) {
+                    val yesterdayStart = (startCal.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }
+                    val yesterdayEnd = (endCal.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }
+                    
+                    val yStartMillis = yesterdayStart.timeInMillis
+                    val yEndMillis = yesterdayEnd.timeInMillis
+                    
+                    if (now >= yStartMillis && now < yEndMillis - 1000) {
+                        val elapsedSinceStart = now - yStartMillis
+                        val intervalsPassed = elapsedSinceStart / freqMillis
+                        val nextRun = yStartMillis + (intervalsPassed + 1) * freqMillis
                         
-                        if (now >= yesterdayStart.timeInMillis && now < yesterdayEnd.timeInMillis - 1000) {
-                            val nextFreq = now + (task.frequencyMinutes * 60000)
-                            return if (nextFreq < yesterdayEnd.timeInMillis) nextFreq else null
+                        if (nextRun < yEndMillis) {
+                            return nextRun
                         }
                     }
-                } else {
-                    return startCal.timeInMillis
                 }
             }
         }
