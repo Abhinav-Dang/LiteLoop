@@ -87,4 +87,9 @@ dependencies {
     testImplementation(libs.mockito.core)
     debugImplementation(libs.ui.test.manifest)
     debugImplementation(libs.ui.tooling)
+
+    tasks.withType<Test> {
+        maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).takeIf { it > 0 } ?: 1
+        setForkEvery(100)
+    }
 }
