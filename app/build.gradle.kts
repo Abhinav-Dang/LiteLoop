@@ -16,12 +16,15 @@ android {
         applicationId = "com.example.liteloop"
         minSdk = 30
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
-
+        versionCode = 2
+        versionName = "1.1.0"
     }
 
     buildTypes {
+        getByName("debug") {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-DEBUG"
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -30,6 +33,7 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -37,6 +41,18 @@ android {
     useLibrary("wear-sdk")
     buildFeatures {
         compose = true
+    }
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.outputs.forEach { output ->
+            val type = if (variant.name.contains("debug")) "DEBUG" else "RELEASE"
+            val verName = variant.outputs.first().versionName.get()
+            val verCode = variant.outputs.first().versionCode.get()
+            val fileName = "LiteLoop_${verName}_v${verCode}_$type.apk"
+            output.outputFileName.set(fileName)
+        }
     }
 }
 

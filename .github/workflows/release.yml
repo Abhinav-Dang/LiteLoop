@@ -34,30 +34,39 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew assembleDebug
 
-      - name: Generate Version and Tag
+      - name: Generate Release Info
         id: vars
         run: |
-          VERSION_CODE=$(grep "versionCode =" app/build.gradle.kts | sed 's/[^0-9]*//g')
-          VERSION_NAME=$(grep "versionName =" app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
-          TAG="v${VERSION_NAME}-build${VERSION_CODE}-${GITHUB_SHA::7}"
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-          echo "version=${VERSION_NAME}" >> $GITHUB_OUTPUT
+          # Find the generated APK
+          APK_PATH=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+          APK_NAME=$(basename $APK_PATH)
+          
+          # Extract version from APK name (LiteLoop_1.1.0_v2_DEBUG.apk)
+          VERSION=$(echo $APK_NAME | cut -d'_' -f2)
+          CODE=$(echo $APK_NAME | cut -d'_' -f3)
+          
+          TAG="v${VERSION}-b${CODE#v}-${GITHUB_SHA::7}"
+          
+          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+          echo "apk_name=$APK_NAME" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.vars.outputs.tag }}
-          name: Release ${{ steps.vars.outputs.tag }}
+          name: LiteLoop Release ${{ steps.vars.outputs.version }}
           body: |
-            ## Automated Release
+            ## 🚀 New Release: ${{ steps.vars.outputs.version }}
             
-            Changes in this version:
+            ### 📝 Changes
             ${{ github.event.head_commit.message }}
             
-            ### Artifacts
-            - **APK**: `app-debug.apk` (Debug build)
+            ---
+            *Automated build of `${{ steps.vars.outputs.apk_name }}`*
           draft: false
           prerelease: false
-          files: app/build/outputs/apk/debug/app-debug.apk
+          files: ${{ steps.vars.outputs.apk_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
