@@ -4,20 +4,38 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+fun getGitVersionName(): String {
+    return try {
+        val process = Runtime.getRuntime().exec("git describe --tags --abbrev=0")
+        val reader = process.inputStream.bufferedReader()
+        val tag = reader.readLine()?.trim() ?: "1.1.0"
+        tag.replace(Regex("^v"), "").split("-")[0]
+    } catch (e: Exception) {
+        "1.1.0"
+    }
+}
+
+fun getGitVersionCode(): Int {
+    return try {
+        val process = Runtime.getRuntime().exec("git rev-list --count HEAD")
+        val reader = process.inputStream.bufferedReader()
+        val count = reader.readLine()?.trim()?.toInt() ?: 1
+        count
+    } catch (e: Exception) {
+        1
+    }
+}
+
 android {
     namespace = "com.example.liteloop"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.liteloop"
         minSdk = 30
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = getGitVersionCode()
+        versionName = getGitVersionName()
     }
 
     buildTypes {
