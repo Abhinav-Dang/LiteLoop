@@ -48,10 +48,9 @@ android {
 androidComponents {
     onVariants { variant ->
         variant.outputs.forEach { output ->
-            val type = if (variant.name.contains("debug")) "DEBUG" else "RELEASE"
+            val type = if (variant.name.contains("debug")) "dbg" else "rel"
             val verName = variant.outputs.first().versionName.get()
-            val verCode = variant.outputs.first().versionCode.get()
-            val fileName = "LiteLoop_${verName}_v${verCode}_$type.apk"
+            val fileName = "LiteLoop_${verName}_$type.apk"
             output.outputFileName.set(fileName)
         }
     }

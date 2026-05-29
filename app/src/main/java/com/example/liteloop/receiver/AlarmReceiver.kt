@@ -48,6 +48,7 @@ class AlarmReceiver : BroadcastReceiver() {
     }
 
     private fun triggerVibration(context: Context) {
+        LLog.d(TAG, "Vibration triggered for reminder")
         val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
             vibratorManager.defaultVibrator
