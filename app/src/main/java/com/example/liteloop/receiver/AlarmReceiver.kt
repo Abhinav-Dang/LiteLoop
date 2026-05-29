@@ -31,15 +31,20 @@ class AlarmReceiver : BroadcastReceiver() {
         LLog.d(TAG, "onReceive: Task ID $taskId, Name: $taskName")
 
         if (taskId != -1L) {
-            triggerVibration(context)
-            showNotification(context, taskName)
-            speakTaskName(context, taskName)
-
             val scope = CoroutineScope(Dispatchers.IO)
             scope.launch {
                 val db = AppDatabase.getDatabase(context)
                 val task = db.taskDao().getTaskById(taskId)
                 task?.let {
+                    triggerVibration(context)
+                    showNotification(context, taskName)
+                    
+                    if (it.isTtsEnabled) {
+                        speakTaskName(context, taskName)
+                    } else {
+                        LLog.d(TAG, "TTS disabled for this task, skipping speech")
+                    }
+
                     LLog.d(TAG, "Scheduling next alarm for ${it.name}")
                     ReminderScheduler(context).scheduleNextAlarm(it)
                 }

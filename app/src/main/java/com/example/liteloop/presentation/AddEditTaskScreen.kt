@@ -34,6 +34,7 @@ fun AddEditTaskScreen(
     var endMinutes by remember { mutableStateOf(((task?.endTime ?: 61200000) % 3600000) / 60000) }
     
     var frequency by remember { mutableStateOf(task?.frequencyMinutes ?: 10) }
+    var isTtsEnabled by remember { mutableStateOf(task?.isTtsEnabled ?: true) }
     
     val listState = rememberTransformingLazyColumnState()
 
@@ -48,7 +49,8 @@ fun AddEditTaskScreen(
                     endTime = endHours * 3600000 + endMinutes * 60000,
                     frequencyMinutes = frequency,
                     daysOfWeek = "1,2,3,4,5,6,7",
-                    isActive = task?.isActive ?: true
+                    isActive = task?.isActive ?: true,
+                    isTtsEnabled = isTtsEnabled
                 )
                 if (task == null) viewModel.insertTask(newTask) else viewModel.updateTask(newTask)
                 onBack()
@@ -111,6 +113,28 @@ fun AddEditTaskScreen(
                     onIncrement = { if (frequency < 120) frequency += 1 },
                     onDecrement = { if (frequency > 1) frequency -= 1 }
                 )
+            }
+
+            item {
+                Card(
+                    onClick = { isTtsEnabled = !isTtsEnabled },
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Voice Name", style = MaterialTheme.typography.bodySmall)
+                        Button(
+                            onClick = { isTtsEnabled = !isTtsEnabled },
+                            modifier = Modifier.size(48.dp),
+                            colors = if (isTtsEnabled) ButtonDefaults.buttonColors() else ButtonDefaults.filledTonalButtonColors()
+                        ) {
+                            Text(if (isTtsEnabled) "On" else "Off", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
             }
 
             if (task != null) {
