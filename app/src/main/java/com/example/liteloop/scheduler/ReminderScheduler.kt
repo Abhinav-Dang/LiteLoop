@@ -7,27 +7,42 @@ import android.content.Intent
 import android.os.Build
 import com.example.liteloop.data.Task
 import com.example.liteloop.receiver.AlarmReceiver
+import com.example.liteloop.util.LLog
 import java.util.*
 
 class ReminderScheduler(private val context: Context?) {
 
     private val alarmManager = context?.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+    private val TAG = "Scheduler"
 
     fun scheduleNextAlarm(task: Task) {
-        if (context == null || alarmManager == null) return
+        LLog.d(TAG, "scheduleNextAlarm for task: ${task.name} (ID: ${task.id})")
+        
+        if (context == null || alarmManager == null) {
+            LLog.e(TAG, "Context or AlarmManager is null, cannot schedule")
+            return
+        }
         
         if (!task.isActive) {
+            LLog.d(TAG, "Task is inactive, canceling any existing alarms")
             cancelAlarm(task)
             return
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (!alarmManager.canScheduleExactAlarms()) {
+                LLog.e(TAG, "Missing SCHEDULE_EXACT_ALARM permission")
                 return
             }
         }
 
-        val nextTime = calculateNextOccurrence(task) ?: return
+        val nextTime = calculateNextOccurrence(task)
+        if (nextTime == null) {
+            LLog.w(TAG, "Could not calculate next occurrence for task: ${task.name}")
+            return
+        }
+
+        LLog.d(TAG, "Next alarm for '${task.name}' scheduled at: ${formatTime(nextTime)}")
 
         val intent = Intent(context, AlarmReceiver::class.java).apply {
             putExtra("TASK_ID", task.id)
@@ -51,6 +66,7 @@ class ReminderScheduler(private val context: Context?) {
     fun cancelAlarm(task: Task) {
         if (context == null || alarmManager == null) return
         
+        LLog.d(TAG, "Canceling alarm for task: ${task.name}")
         val intent = Intent(context, AlarmReceiver::class.java)
         val pendingIntent = PendingIntent.getBroadcast(
             context,
@@ -67,14 +83,18 @@ class ReminderScheduler(private val context: Context?) {
         return calculateNextOccurrenceAtTime(task, System.currentTimeMillis())
     }
 
-    // Extracted for testing
+    private fun formatTime(millis: Long): String {
+        val cal = Calendar.getInstance().apply { timeInMillis = millis }
+        return "%02d:%02d:%02d".format(cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), cal.get(Calendar.SECOND))
+    }
+
     fun calculateNextOccurrenceAtTime(task: Task, now: Long): Long? {
         val daysList = task.daysOfWeek.split(",").filter { it.isNotEmpty() }.map { it.toInt() }
         if (daysList.isEmpty()) return null
 
         val today = Calendar.getInstance().apply { timeInMillis = now }
         
-        for (i in 0..7) { // Check today and next 7 days
+        for (i in 0..7) {
             val checkDate = (today.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, i) }
             val dayOfWeek = checkDate.get(Calendar.DAY_OF_WEEK)
             val mappedDay = if (dayOfWeek == Calendar.SUNDAY) 7 else dayOfWeek - 1
@@ -94,41 +114,32 @@ class ReminderScheduler(private val context: Context?) {
                     set(Calendar.MILLISECOND, 0)
                 }
 
-                // Handle midnight spanning
                 if (task.endTime <= task.startTime) {
                     endCal.add(Calendar.DAY_OF_YEAR, 1)
                 }
 
-                if (i == 0) { // Today
-                    // If window spans midnight and we are currently in the part of the window 
-                    // that belongs to the previous day's start (i.e., after midnight but before end time)
-                    // we should check that too.
-                    
-                    // First check the current day's window
+                if (i == 0) {
                     if (now < startCal.timeInMillis) {
                         return startCal.timeInMillis
-                    } else if (now >= startCal.timeInMillis && now < endCal.timeInMillis - 60000) {
+                    } else if (now >= startCal.timeInMillis && now < endCal.timeInMillis - 1000) {
                         val nextFreq = now + (task.frequencyMinutes * 60000)
                         return if (nextFreq < endCal.timeInMillis) nextFreq else null
                     }
                     
-                    // Then check if we are in the tail end of yesterday's window
                     if (task.endTime <= task.startTime) {
                         val yesterdayStart = (startCal.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }
                         val yesterdayEnd = (endCal.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }
                         
-                        if (now >= yesterdayStart.timeInMillis && now < yesterdayEnd.timeInMillis - 60000) {
+                        if (now >= yesterdayStart.timeInMillis && now < yesterdayEnd.timeInMillis - 1000) {
                             val nextFreq = now + (task.frequencyMinutes * 60000)
                             return if (nextFreq < yesterdayEnd.timeInMillis) nextFreq else null
                         }
                     }
-                    
                 } else {
                     return startCal.timeInMillis
                 }
             }
         }
-        
         return null
     }
 }

@@ -44,6 +44,15 @@
             </intent-filter>
         </receiver>
 
+        <service
+            android:name=".service.LiteLoopService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Ensuring periodic reminders trigger reliably on Wear OS by preventing process freezing."/>
+        </service>
+
         <activity
             android:name=".presentation.MainActivity"
             android:exported="true"

@@ -1,14 +1,16 @@
 package com.example.liteloop.presentation
 
+import android.content.Intent
+import android.provider.Settings
+import android.net.Uri
+import android.os.Build
 import androidx.compose.foundation.layout.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
@@ -28,6 +30,14 @@ fun TaskListScreen(
 ) {
     val tasks by viewModel.allTasks.collectAsState(initial = emptyList())
     val listState = rememberTransformingLazyColumnState()
+    val context = LocalContext.current
+    
+    var isPermissionGranted by remember { mutableStateOf(viewModel.isAlarmPermissionGranted()) }
+
+    // Re-check permission when screen becomes visible
+    LaunchedEffect(Unit) {
+        isPermissionGranted = viewModel.isAlarmPermissionGranted()
+    }
 
     ScreenScaffold(
         scrollState = listState,
@@ -48,12 +58,39 @@ fun TaskListScreen(
                 }
             }
 
+            if (!isPermissionGranted) {
+                item {
+                    Card(
+                        onClick = {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                    data = Uri.fromParts("package", context.packageName, null)
+                                }
+                                context.startActivity(intent)
+                            }
+                        },
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        ),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                    ) {
+                        Text(
+                            text = "Action Required: Tap to enable 'Alarms & Reminders' for LiteLoop",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+
             if (tasks.isEmpty()) {
                 item {
                     Text(
                         text = "No tasks yet",
                         style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(16.dp)
+                        modifier = Modifier.padding(16.dp),
+                        textAlign = TextAlign.Center
                     )
                 }
             } else {
@@ -63,6 +100,20 @@ fun TaskListScreen(
                         onToggle = { viewModel.toggleTaskActive(task) },
                         onClick = { onEditTask(task) }
                     )
+                }
+                
+                item {
+                    Spacer(modifier = Modifier.height(20.dp))
+                }
+                
+                item {
+                   Text(
+                       text = "Reliability Mode: ON\n(Prevents Watch from freezing app)",
+                       style = MaterialTheme.typography.labelSmall,
+                       color = MaterialTheme.colorScheme.onSurfaceVariant,
+                       textAlign = TextAlign.Center,
+                       modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp)
+                   )
                 }
             }
         }

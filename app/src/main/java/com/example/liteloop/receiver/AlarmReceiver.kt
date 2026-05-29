@@ -14,6 +14,7 @@ import androidx.core.app.NotificationCompat
 import com.example.liteloop.R
 import com.example.liteloop.data.AppDatabase
 import com.example.liteloop.scheduler.ReminderScheduler
+import com.example.liteloop.util.LLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -21,22 +22,25 @@ import java.util.Locale
 
 class AlarmReceiver : BroadcastReceiver() {
     private var tts: TextToSpeech? = null
+    private val TAG = "AlarmReceiver"
 
     override fun onReceive(context: Context, intent: Intent) {
         val taskId = intent.getLongExtra("TASK_ID", -1)
         val taskName = intent.getStringExtra("TASK_NAME") ?: "Reminder"
+
+        LLog.d(TAG, "onReceive: Task ID $taskId, Name: $taskName")
 
         if (taskId != -1L) {
             triggerVibration(context)
             showNotification(context, taskName)
             speakTaskName(context, taskName)
 
-            // Schedule next occurrence
             val scope = CoroutineScope(Dispatchers.IO)
             scope.launch {
                 val db = AppDatabase.getDatabase(context)
                 val task = db.taskDao().getTaskById(taskId)
                 task?.let {
+                    LLog.d(TAG, "Scheduling next alarm for ${it.name}")
                     ReminderScheduler(context).scheduleNextAlarm(it)
                 }
             }
@@ -76,16 +80,23 @@ class AlarmReceiver : BroadcastReceiver() {
             .setAutoCancel(true)
             .build()
 
-        notificationManager.notify(System.currentTimeMillis().toInt(), notification)
+        notificationManager.notify(taskIdToNotificationId(taskName), notification)
+    }
+
+    private fun taskIdToNotificationId(name: String): Int {
+        return name.hashCode()
     }
 
     private fun speakTaskName(context: Context, taskName: String) {
+        LLog.d(TAG, "Attempting to speak: $taskName")
         tts = TextToSpeech(context.applicationContext) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 tts?.let {
                     it.language = Locale.US
                     it.speak(taskName, TextToSpeech.QUEUE_FLUSH, null, "LiteLoopTTS")
                 }
+            } else {
+                LLog.e(TAG, "TTS Initialization failed with status: $status")
             }
         }
     }

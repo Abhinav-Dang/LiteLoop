@@ -10,7 +10,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -28,11 +27,9 @@ fun AddEditTaskScreen(
 ) {
     var name by remember { mutableStateOf(task?.name ?: "") }
     
-    // Start Time
     var startHours by remember { mutableStateOf((task?.startTime ?: 32400000) / 3600000) }
     var startMinutes by remember { mutableStateOf(((task?.startTime ?: 32400000) % 3600000) / 60000) }
     
-    // End Time
     var endHours by remember { mutableStateOf((task?.endTime ?: 61200000) / 3600000) }
     var endMinutes by remember { mutableStateOf(((task?.endTime ?: 61200000) % 3600000) / 60000) }
     
@@ -50,7 +47,7 @@ fun AddEditTaskScreen(
                     startTime = startHours * 3600000 + startMinutes * 60000,
                     endTime = endHours * 3600000 + endMinutes * 60000,
                     frequencyMinutes = frequency,
-                    daysOfWeek = "1,2,3,4,5",
+                    daysOfWeek = "1,2,3,4,5,6,7",
                     isActive = task?.isActive ?: true
                 )
                 if (task == null) viewModel.insertTask(newTask) else viewModel.updateTask(newTask)
@@ -111,8 +108,8 @@ fun AddEditTaskScreen(
             item {
                 InputCard(
                     label = "Every: ${frequency}m",
-                    onIncrement = { if (frequency < 120) frequency += 5 },
-                    onDecrement = { if (frequency > 5) frequency -= 5 }
+                    onIncrement = { if (frequency < 120) frequency += 1 },
+                    onDecrement = { if (frequency > 1) frequency -= 1 }
                 )
             }
 
@@ -150,7 +147,6 @@ fun TimeInputCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                // Hours
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     IconButton(onClick = { if (hours < 23) onHoursChange(hours + 1) else onHoursChange(0) }, modifier = Modifier.size(32.dp)) {
                         Icon(Icons.Default.Add, contentDescription = "Add Hour")
@@ -163,7 +159,6 @@ fun TimeInputCard(
                 
                 Text(":", style = MaterialTheme.typography.titleMedium)
                 
-                // Minutes
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     IconButton(onClick = { if (minutes < 59) onMinutesChange(minutes + 1) else onMinutesChange(0) }, modifier = Modifier.size(32.dp)) {
                         Icon(Icons.Default.Add, contentDescription = "Add Minute")

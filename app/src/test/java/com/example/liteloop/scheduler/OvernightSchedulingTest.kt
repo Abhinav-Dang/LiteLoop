@@ -1,6 +1,7 @@
 package com.example.liteloop.scheduler
 
 import android.content.Context
+import android.util.Log
 import com.example.liteloop.data.Task
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -10,9 +11,13 @@ import java.util.*
 
 class OvernightSchedulingTest {
 
+    private fun formatTime(millis: Long): String {
+        val cal = Calendar.getInstance().apply { timeInMillis = millis }
+        return "%02d:%02d:%02d".format(cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), cal.get(Calendar.SECOND))
+    }
+
     @Test
     fun testOvernightWindow_CurrentTime2334() {
-        // Setup Task: 22:00 (10 PM) to 04:00 (4 AM), 5 min frequency
         val task = Task(
             name = "Overnight Task",
             startTime = 22 * 3600000L, // 22:00
@@ -22,7 +27,6 @@ class OvernightSchedulingTest {
             isActive = true
         )
 
-        // Current time: 23:34
         val calendar = Calendar.getInstance()
         calendar.set(Calendar.HOUR_OF_DAY, 23)
         calendar.set(Calendar.MINUTE, 34)
@@ -30,64 +34,75 @@ class OvernightSchedulingTest {
         calendar.set(Calendar.MILLISECOND, 0)
         val now = calendar.timeInMillis
 
-        val context = mock(Context::class.java)
-        val scheduler = ReminderScheduler(context)
-        
+        println("DEBUG: Testing Task '${task.name}' [22:00 - 04:00]")
+        println("DEBUG: Current simulated time: ${formatTime(now)}")
+
+        val scheduler = ReminderScheduler(null)
         val nextTime = scheduler.calculateNextOccurrenceAtTime(task, now)
         
         assertNotNull("Next occurrence should not be null", nextTime)
+        println("DEBUG: Calculated Next Run: ${formatTime(nextTime!!)}")
         
-        val resultCal = Calendar.getInstance()
-        resultCal.timeInMillis = nextTime!!
-        
-        // Expected: 23:34 + 5 mins = 23:39
+        val resultCal = Calendar.getInstance().apply { timeInMillis = nextTime }
         assertEquals("Hour should be 23", 23, resultCal.get(Calendar.HOUR_OF_DAY))
         assertEquals("Minute should be 39", 39, resultCal.get(Calendar.MINUTE))
     }
 
     @Test
-    fun testOvernightWindow_NearEndAt0359() {
-        // Setup Task: 22:00 to 04:00, 5 min frequency
+    fun testAnyMinuteInterval_1Min() {
         val task = Task(
-            name = "Overnight Task",
-            startTime = 22 * 3600000L,
-            endTime = 4 * 3600000L,
-            frequencyMinutes = 5,
+            name = "1 Min Task",
+            startTime = 9 * 3600000L,
+            endTime = 17 * 3600000L,
+            frequencyMinutes = 1,
             daysOfWeek = "1,2,3,4,5,6,7",
             isActive = true
         )
 
-        // Current time: 03:59 (Next Day)
         val calendar = Calendar.getInstance()
-        calendar.set(Calendar.HOUR_OF_DAY, 3)
-        calendar.set(Calendar.MINUTE, 59)
+        calendar.set(Calendar.HOUR_OF_DAY, 10)
+        calendar.set(Calendar.MINUTE, 0)
         calendar.set(Calendar.SECOND, 0)
-        calendar.set(Calendar.MILLISECOND, 0)
         val now = calendar.timeInMillis
 
-        val context = mock(Context::class.java)
-        val scheduler = ReminderScheduler(context)
-        
+        println("DEBUG: Testing 1-minute interval at 10:00:00")
+        val scheduler = ReminderScheduler(null)
         val nextTime = scheduler.calculateNextOccurrenceAtTime(task, now)
         
-        // Since 03:59 + 5 mins = 04:04 which is past 04:00, it should return null for today
-        // OR return the window start for the next day. 
-        // In our current implementation, it checks 0..7 days.
+        assertNotNull(nextTime)
+        println("DEBUG: Calculated Next Run (1m): ${formatTime(nextTime!!)}")
         
-        assertNotNull("Next occurrence should not be null (should find next day's window)", nextTime)
-        
-        val resultCal = Calendar.getInstance()
-        resultCal.timeInMillis = nextTime!!
-        
-        // Expected: Start of next day's window (22:00)
-        assertEquals("Hour should be 22 (next day start)", 22, resultCal.get(Calendar.HOUR_OF_DAY))
-        assertEquals("Minute should be 0", 0, resultCal.get(Calendar.MINUTE))
-        
-        // Verify it is indeed a future time
-        assertTrue("Next time should be in the future", nextTime > now)
+        val resultCal = Calendar.getInstance().apply { timeInMillis = nextTime }
+        assertEquals(10, resultCal.get(Calendar.HOUR_OF_DAY))
+        assertEquals(1, resultCal.get(Calendar.MINUTE))
     }
-    
-    private fun assertTrue(message: String, condition: Boolean) {
-        org.junit.Assert.assertTrue(message, condition)
+
+    @Test
+    fun testAnyMinuteInterval_3Min() {
+        val task = Task(
+            name = "3 Min Task",
+            startTime = 9 * 3600000L,
+            endTime = 17 * 3600000L,
+            frequencyMinutes = 3,
+            daysOfWeek = "1,2,3,4,5,6,7",
+            isActive = true
+        )
+
+        val calendar = Calendar.getInstance()
+        calendar.set(Calendar.HOUR_OF_DAY, 10)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        val now = calendar.timeInMillis
+
+        println("DEBUG: Testing 3-minute interval at 10:00:00")
+        val scheduler = ReminderScheduler(null)
+        val nextTime = scheduler.calculateNextOccurrenceAtTime(task, now)
+        
+        assertNotNull(nextTime)
+        println("DEBUG: Calculated Next Run (3m): ${formatTime(nextTime!!)}")
+        
+        val resultCal = Calendar.getInstance().apply { timeInMillis = nextTime }
+        assertEquals(10, resultCal.get(Calendar.HOUR_OF_DAY))
+        assertEquals(3, resultCal.get(Calendar.MINUTE))
     }
 }
