@@ -27,28 +27,34 @@ class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val taskId = intent.getLongExtra("TASK_ID", -1)
         val taskName = intent.getStringExtra("TASK_NAME") ?: "Reminder"
+        val action = intent.action ?: "No Action"
 
-        LLog.d(TAG, "onReceive: Task ID $taskId, Name: $taskName")
+        LLog.d(TAG, "onReceive: Action: $action, Task ID: $taskId, Name: $taskName")
 
-        if (taskId != -1L) {
-            val scope = CoroutineScope(Dispatchers.IO)
-            scope.launch {
-                val db = AppDatabase.getDatabase(context)
-                val task = db.taskDao().getTaskById(taskId)
-                task?.let {
-                    triggerVibration(context)
-                    showNotification(context, taskName)
-                    
-                    if (it.isTtsEnabled) {
-                        speakTaskName(context, taskName)
-                    } else {
-                        LLog.d(TAG, "TTS disabled for this task, skipping speech")
+        // Safety check: ensure the action matches the task ID to confirm independence
+        if (action == "com.example.liteloop.ALARM_$taskId") {
+            if (taskId != -1L) {
+                val scope = CoroutineScope(Dispatchers.IO)
+                scope.launch {
+                    val db = AppDatabase.getDatabase(context)
+                    val task = db.taskDao().getTaskById(taskId)
+                    task?.let {
+                        triggerVibration(context)
+                        showNotification(context, taskName)
+                        
+                        if (it.isTtsEnabled) {
+                            speakTaskName(context, taskName)
+                        } else {
+                            LLog.d(TAG, "TTS disabled for this task, skipping speech")
+                        }
+
+                        LLog.d(TAG, "Scheduling next alarm for ${it.name}")
+                        ReminderScheduler(context).scheduleNextAlarm(it)
                     }
-
-                    LLog.d(TAG, "Scheduling next alarm for ${it.name}")
-                    ReminderScheduler(context).scheduleNextAlarm(it)
                 }
             }
+        } else {
+            LLog.w(TAG, "Received mismatching action or ID. Action: $action, ID: $taskId. Ignoring.")
         }
     }
 

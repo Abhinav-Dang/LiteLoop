@@ -45,6 +45,7 @@ class ReminderScheduler(private val context: Context?) {
         LLog.d(TAG, "Next alarm for '${task.name}' scheduled at: ${formatTime(nextTime)}")
 
         val intent = Intent(context, AlarmReceiver::class.java).apply {
+            action = "com.example.liteloop.ALARM_${task.id}"
             putExtra("TASK_ID", task.id)
             putExtra("TASK_NAME", task.name)
         }
@@ -67,7 +68,9 @@ class ReminderScheduler(private val context: Context?) {
         if (context == null || alarmManager == null) return
         
         LLog.d(TAG, "Canceling alarm for task: ${task.name}")
-        val intent = Intent(context, AlarmReceiver::class.java)
+        val intent = Intent(context, AlarmReceiver::class.java).apply {
+            action = "com.example.liteloop.ALARM_${task.id}"
+        }
         val pendingIntent = PendingIntent.getBroadcast(
             context,
             task.id.toInt(),
